@@ -67,6 +67,8 @@ executable dofgen
     other-modules:
       Paths_dofgen
       Dofgen.Ui.Main
+      Dofgen.Core.Main
+      Dofgen.Core.Layout
 
     build-depends:
       , base ^>=4.20.0.0
