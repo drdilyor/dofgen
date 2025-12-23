@@ -71,6 +71,8 @@ executable dofgen
     build-depends:
       , base ^>=4.20.0.0
       , hsqml ^>=0.3.7.0
+      , mtl
+      , transformers
 
     hs-source-dirs:   app
 

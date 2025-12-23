@@ -3,7 +3,7 @@
 
   inputs.nixpkgs.url = "github:nixos/nixpkgs?ref=nixpkgs-unstable";
 
-  outputs = inputs@{ flake-parts, nixpkgs, ... }:
+  outputs = inputs@{ nixpkgs, ... }:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
@@ -21,9 +21,9 @@
         };
       };
 
-      cpmonad = returnShellEnv:
+      dofgen = returnShellEnv:
         let
-          cpmonad = hpkgs.developPackage {
+          dofgen = hpkgs.developPackage {
             root = ./.;
             inherit returnShellEnv;
             modifier = pkgs.haskell.lib.compose.overrideCabal (old: {
@@ -50,7 +50,7 @@
             });
           };
         in
-        if !returnShellEnv then cpmonad else cpmonad.overrideAttrs (old: {
+        if !returnShellEnv then dofgen else dofgen.overrideAttrs (old: {
           shellHook = (old.shellHook or "") + "\n" + ''
             length=''${#qtWrapperArgs[@]}
             for ((n = 0; n < length; n += 1))
@@ -70,11 +70,11 @@
     in
     {
       packages.${system} = {
-        default = cpmonad false;
+        default = dofgen false;
         inherit hpkgs pkgs;
       };
       devShells.${system} = {
-        default = cpmonad true;
+        default = dofgen true;
       };
     };
 }
