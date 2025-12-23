@@ -1,4 +1,6 @@
 module Main (main) where
 
+import Dofgen.Ui.Main qualified
+
 main :: IO ()
-main = putStrLn "Hello, Haskell!"
+main = Dofgen.Ui.Main.main

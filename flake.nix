@@ -2,49 +2,79 @@
   description = "Competitive programming problemsetting toolchain in Haskell";
 
   inputs.nixpkgs.url = "github:nixos/nixpkgs?ref=nixpkgs-unstable";
-  inputs.flake-parts.url = "github:hercules-ci/flake-parts";
 
   outputs = inputs@{ flake-parts, nixpkgs, ... }:
-    flake-parts.lib.mkFlake { inherit inputs; } {
-      systems = [
-        "x86_64-linux"
-        "aarch64-darwin"
-      ];
-
-      perSystem = { system, pkgs, ... }:
-        let
-          hpkgs = pkgs.haskell.packages.ghc912;
-
-          cpmonad = returnShellEnv:
-            hpkgs.developPackage {
-              root = ./.;
-              inherit returnShellEnv;
-              modifier = drv:
-                let drv' = 
-                  if returnShellEnv then
-                    pkgs.haskell.lib.addBuildTools drv (
-                      with hpkgs;
-                      [
-                        cabal-install
-                        ghcid
-                        haskell-language-server
-                      ]
-                    )
-                  else
-                    drv;
-                in
-                pkgs.haskell.lib.overrideCabal drv' (old: {
-                  doCheck = true;
-                  # didn't work for some reason
-                  doHaddock = returnShellEnv;
-                  enableLibraryProfiling = returnShellEnv;
-                  enableExecutableProfiling = returnShellEnv;
-                });
-            };
-        in
-        {
-          packages.default = cpmonad false;
-          devShells.default = cpmonad true;
+    let
+      system = "x86_64-linux";
+      pkgs = import nixpkgs { inherit system; };
+      lib = pkgs.lib;
+      hpkgs = pkgs.haskell.packages.ghc910.override {
+        overrides = final: prev: {
+          # todo
+          hsqml = prev.hsqml.overrideAttrs (old: {
+            dontWrapQtApps = true;
+            propagatedBuildInputs= (old.propagatedBuildInputs or []) ++ [
+              pkgs.qt5.qtbase
+              pkgs.qt5.qtdeclarative
+            ];
+          });
         };
+      };
+
+      cpmonad = returnShellEnv:
+        let
+          cpmonad = hpkgs.developPackage {
+            root = ./.;
+            inherit returnShellEnv;
+            modifier = pkgs.haskell.lib.compose.overrideCabal (old: {
+              buildTools = (old.buildTools or []) ++ lib.optionals returnShellEnv
+                [ hpkgs.cabal-install
+                  hpkgs.ghcid
+                  hpkgs.haskell-language-server
+                ];
+
+              doCheck = true;
+              doHaddock = returnShellEnv;
+              enableLibraryProfiling = returnShellEnv;
+              enableExecutableProfiling = returnShellEnv;
+
+              executableToolDepends = (old.executableToolDepends or []) ++ [
+                pkgs.qt5.wrapQtAppsHook
+              ];
+              executablePkgconfigDepends = (old.executablePkgconfigDepends or []) ++ [
+                pkgs.qt5.qtbase
+                pkgs.qt5.qtdeclarative
+                pkgs.qt5.qtquickcontrols
+                pkgs.qt5.qtquickcontrols2
+              ];
+            });
+          };
+        in
+        if !returnShellEnv then cpmonad else cpmonad.overrideAttrs (old: {
+          shellHook = (old.shellHook or "") + "\n" + ''
+            length=''${#qtWrapperArgs[@]}
+            for ((n = 0; n < length; n += 1))
+            do
+              case "''${qtWrapperArgs[n]}" in
+                --prefix)
+                  declare var="''${qtWrapperArgs[n + 1]}"
+                  declare sep="''${qtWrapperArgs[n + 2]}"
+                  declare cur="''${!var}"
+                  declare "$var=''${qtWrapperArgs[n + 3]}''${cur:+$sep$cur}"
+                  export "$var"
+                ;;
+              esac
+            done
+          '';
+        });
+    in
+    {
+      packages.${system} = {
+        default = cpmonad false;
+        inherit hpkgs pkgs;
+      };
+      devShells.${system} = {
+        default = cpmonad true;
+      };
     };
 }
